@@ -1,21 +1,22 @@
 {
-  "id": "pjpzV0PNH27UHWVn",
-  "name": "Órbita | 05 · Entrega WhatsApp",
+  "id": "DS09OVYC0j9mR1mU",
+  "name": "Órbita | 02 · Entregar respostas — Telegram",
   "active": false,
   "isArchived": false,
-  "versionId": "76d90c35-4bb0-410d-8d89-aac5321b749f",
+  "versionId": "dbe30b57-a897-4762-be75-8e1badc5f613",
   "activeVersionId": null,
   "triggerCount": 0,
   "nodeCount": 5,
-  "createdAt": "2026-09-27T14:13:20.235Z",
-  "updatedAt": "2026-09-27T14:13:20.235Z",
+  "createdAt": "2026-09-27T14:13:18.126Z",
+  "updatedAt": "2026-09-27T20:43:04.845Z",
   "settings": {
     "executionOrder": "v1",
-    "availableInMCP": true
+    "availableInMCP": true,
+    "binaryMode": "separate"
   },
   "tags": [],
   "parentFolderId": null,
-  "description": "Janela de 24h validada no banco. Fora da janela, falha visível para tratamento humano.",
+  "description": "Entrega as mensagens do bot e do operador no Telegram, revalida pausa e registra status. O simulador recebe as respostas no próprio CRM.",
   "scopes": [
     "execution:reveal",
     "workflow:create",
@@ -63,14 +64,14 @@
       "main": [
         [
           {
-            "node": "Enviar mensagem no WhatsApp",
+            "node": "Enviar mensagem no Telegram",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Enviar mensagem no WhatsApp": {
+    "Enviar mensagem no Telegram": {
       "main": [
         [
           {
@@ -84,14 +85,6 @@
   },
   "nodes": [
     {
-      "id": "25bfe54a-1a1e-49aa-81c2-b78c166bd459",
-      "name": "Entregar fila a cada minuto",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.4,
-      "position": [
-        0,
-        0
-      ],
       "parameters": {
         "rule": {
           "interval": [
@@ -101,17 +94,17 @@
             }
           ]
         }
-      }
+      },
+      "id": "1a5ed4e9-9cf8-47d9-8981-07a7be09d1c2",
+      "name": "Entregar fila a cada minuto",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        -48
+      ]
     },
     {
-      "id": "2ca9fe00-47b0-4017-b058-e2f4c597b6cb",
-      "name": "Reservar mensagens pendentes",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.5,
-      "position": [
-        224,
-        0
-      ],
       "parameters": {
         "method": "POST",
         "url": "https://urgwupjlpoerkdkfunti.supabase.co/functions/v1/orbita-automation",
@@ -119,21 +112,21 @@
         "genericAuthType": "httpTemplatedCustomAuth",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({action:\"claim\",data:{channel:\"whatsapp\"}}) }}",
+        "jsonBody": "={{ JSON.stringify({action:\"claim\",data:{channel:\"telegram\"}}) }}",
         "options": {
           "timeout": 15000
         }
-      }
-    },
-    {
-      "id": "b66ab246-2318-48be-9e3a-cceec83b2986",
-      "name": "Conferir pausa antes do envio",
+      },
+      "id": "1b60dbee-6c8c-47c9-a0fc-889f09d9e43d",
+      "name": "Reservar mensagens pendentes",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
       "position": [
-        448,
-        0
-      ],
+        208,
+        -48
+      ]
+    },
+    {
       "parameters": {
         "method": "POST",
         "url": "https://urgwupjlpoerkdkfunti.supabase.co/functions/v1/orbita-automation",
@@ -145,40 +138,41 @@
         "options": {
           "timeout": 15000
         }
-      }
-    },
-    {
-      "id": "6be14145-5850-4501-a832-faf2acf06255",
-      "name": "Enviar mensagem no WhatsApp",
-      "type": "n8n-nodes-base.whatsApp",
-      "typeVersion": 1.1,
-      "position": [
-        672,
-        0
-      ],
-      "parameters": {
-        "resource": "message",
-        "operation": "send",
-        "phoneNumberId": "<__PLACEHOLDER_VALUE__ID do número da empresa no Meta__>",
-        "recipientPhoneNumber": "={{ $json.phone }}",
-        "messageType": "text",
-        "textBody": "={{ $json.body }}",
-        "additionalFields": {
-          "previewUrl": false
-        }
       },
-      "onError": "continueRegularOutput",
-      "webhookId": "76603462-8842-432b-8ca9-346d179a6708"
-    },
-    {
-      "id": "4f538449-d768-4f05-8b5b-862ddfa18303",
-      "name": "Registrar resultado da entrega",
+      "id": "3f25cebd-c8b9-48bb-acf1-df492fdaf7a9",
+      "name": "Conferir pausa antes do envio",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.5,
       "position": [
-        896,
-        0
+        432,
+        -48
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.external_id }}",
+        "text": "={{ $json.body.replace(/&/g,\"&amp;\").replace(/</g,\"&lt;\").replace(/>/g,\"&gt;\") }}",
+        "replyMarkup": "replyKeyboardRemove",
+        "replyKeyboardRemove": {
+          "remove_keyboard": true
+        },
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "id": "56268f26-52d9-4271-a6e0-b30cf4ad692f",
+      "name": "Enviar mensagem no Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        656,
+        -48
       ],
+      "webhookId": "546dcfc6-979e-4625-805e-0750fccc09e2",
+      "onError": "continueRegularOutput"
+    },
+    {
       "parameters": {
         "method": "POST",
         "url": "https://urgwupjlpoerkdkfunti.supabase.co/functions/v1/orbita-automation",
@@ -190,20 +184,28 @@
         "options": {
           "timeout": 15000
         }
-      }
+      },
+      "id": "98051baa-63c6-4fb5-a44c-dfb53f62c33a",
+      "name": "Registrar resultado da entrega",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        880,
+        -48
+      ]
     }
   ],
   "nodeGroups": [
     {
-      "id": "66c68b3a-424a-4986-a522-ac02c3bb5076",
+      "id": "a598ace0-260e-4231-8d0b-683cdd1d1ac6",
       "name": "Entrega controlada",
       "nodeNames": [
         "Reservar mensagens pendentes",
         "Conferir pausa antes do envio",
-        "Enviar mensagem no WhatsApp",
+        "Enviar mensagem no Telegram",
         "Registrar resultado da entrega"
       ],
-      "description": "Janela de 24h validada no banco. Fora da janela, falha visível para tratamento humano."
+      "description": "Reserva a fila, revalida intervenção e registra sucesso ou falha. Não repete envio incerto."
     }
   ],
   "activeVersion": null,

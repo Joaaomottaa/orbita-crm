@@ -9,6 +9,7 @@ Deno.serve(async req=>{
   const raw=await req.text();if(raw.length>32000)return reply({error:'Payload too large'},413);
   const {action,data={}}=JSON.parse(raw);let result;
   if(action==='ingest')result=await db.rpc('orbita_ingest',{p:data});
+  else if(action==='simulator_next')result=await db.rpc('orbita_simulator_next');
   else if(action==='commit')result=await db.rpc('orbita_commit',{p:data});
   else if(action==='claim')result=await db.rpc('orbita_claim_channel',{p_channel:data.channel});
   else if(action==='ack')result=await db.rpc('orbita_ack',{p:data});
@@ -19,5 +20,4 @@ Deno.serve(async req=>{
   return reply(result.data??{ok:true});
  }catch{return reply({error:'Invalid request'},400)}
 });
-
 
