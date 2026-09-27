@@ -1,0 +1,217 @@
+{
+  "id": "olQntewCVoW2sz4X",
+  "name": "Órbita | 04 · Entrada WhatsApp",
+  "active": false,
+  "isArchived": false,
+  "versionId": "644e6b4b-28e1-49a2-8cde-c91c0f34bd68",
+  "activeVersionId": null,
+  "triggerCount": 0,
+  "nodeCount": 5,
+  "createdAt": "2026-09-27T14:13:19.572Z",
+  "updatedAt": "2026-09-27T14:13:19.572Z",
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "tags": [],
+  "parentFolderId": null,
+  "description": "Ignora eventos de status. Cada mensagem usa o telefone fornecido pelo WhatsApp. Reaproveita o mesmo CRM, histórico e regras do Telegram.",
+  "scopes": [
+    "execution:reveal",
+    "workflow:create",
+    "workflow:delete",
+    "workflow:disableRedaction",
+    "workflow:enableRedaction",
+    "workflow:execute",
+    "workflow:execute-chat",
+    "workflow:export",
+    "workflow:import",
+    "workflow:list",
+    "workflow:move",
+    "workflow:publish",
+    "workflow:read",
+    "workflow:share",
+    "workflow:unpublish",
+    "workflow:unshare",
+    "workflow:update"
+  ],
+  "canExecute": true,
+  "connections": {
+    "Mensagem no WhatsApp oficial": {
+      "main": [
+        [
+          {
+            "node": "Separar mensagens e normalizar telefone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Separar mensagens e normalizar telefone": {
+      "main": [
+        [
+          {
+            "node": "Registrar mensagem no CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar mensagem no CRM": {
+      "main": [
+        [
+          {
+            "node": "Somente atendimento automático",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Somente atendimento automático": {
+      "main": [
+        [
+          {
+            "node": "Qualificar no fluxo central",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodes": [
+    {
+      "id": "c4743ab7-6b41-40b2-b6f2-d929d5cf56bc",
+      "name": "Mensagem no WhatsApp oficial",
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "updates": [
+          "messages"
+        ],
+        "options": {}
+      },
+      "webhookId": "2e698bb3-7ab3-4035-9bfb-914b31d1350c"
+    },
+    {
+      "id": "9b561f93-2e3a-40c2-a4f3-938904f7d687",
+      "name": "Separar mensagens e normalizar telefone",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const root=$json;const values=root.entry?root.entry.flatMap(e=>(e.changes||[]).map(c=>c.value)): [root];\nconst out=[];for(const v of values){for(const m of v.messages||[]){if(!m.from||!m.id)continue;out.push({json:{channel:'whatsapp',external_id:String(m.from),event_key:'wa:'+m.id,phone:'+'+String(m.from).replace(/\\D/g,''),name:null,text:m.text?.body||'[Mídia recebida: solicitar mensagem de texto]'}});}}return out;"
+      }
+    },
+    {
+      "id": "143c3a37-ddef-43fe-829b-78f13c4e7f58",
+      "name": "Registrar mensagem no CRM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://urgwupjlpoerkdkfunti.supabase.co/functions/v1/orbita-automation",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({action:\"ingest\",data:$json}) }}",
+        "options": {
+          "timeout": 15000
+        }
+      }
+    },
+    {
+      "id": "bda22c73-f1bb-4cc1-968f-ab83c1462d71",
+      "name": "Somente atendimento automático",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "qualify",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "f745db71-779e-4de3-8936-5f62e0f5780f",
+      "name": "Qualificar no fluxo central",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "i8MOp5VaXEcng8SZ"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    }
+  ],
+  "nodeGroups": [
+    {
+      "id": "329864b5-ea97-4653-b421-d292a8238590",
+      "name": "Identificar e registrar",
+      "nodeNames": [
+        "Separar mensagens e normalizar telefone",
+        "Registrar mensagem no CRM"
+      ],
+      "description": "Ignora eventos de status. Cada mensagem usa o telefone fornecido pelo WhatsApp."
+    },
+    {
+      "id": "40c91dbe-19b7-4b22-9a8f-abd86c88a613",
+      "name": "Qualificação",
+      "nodeNames": [
+        "Somente atendimento automático",
+        "Qualificar no fluxo central"
+      ],
+      "description": "Reaproveita o mesmo CRM, histórico e regras do Telegram."
+    }
+  ],
+  "activeVersion": null,
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  }
+}

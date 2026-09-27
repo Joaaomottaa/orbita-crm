@@ -1,0 +1,214 @@
+{
+  "id": "pjpzV0PNH27UHWVn",
+  "name": "Órbita | 05 · Entrega WhatsApp",
+  "active": false,
+  "isArchived": false,
+  "versionId": "76d90c35-4bb0-410d-8d89-aac5321b749f",
+  "activeVersionId": null,
+  "triggerCount": 0,
+  "nodeCount": 5,
+  "createdAt": "2026-09-27T14:13:20.235Z",
+  "updatedAt": "2026-09-27T14:13:20.235Z",
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "tags": [],
+  "parentFolderId": null,
+  "description": "Janela de 24h validada no banco. Fora da janela, falha visível para tratamento humano.",
+  "scopes": [
+    "execution:reveal",
+    "workflow:create",
+    "workflow:delete",
+    "workflow:disableRedaction",
+    "workflow:enableRedaction",
+    "workflow:execute",
+    "workflow:execute-chat",
+    "workflow:export",
+    "workflow:import",
+    "workflow:list",
+    "workflow:move",
+    "workflow:publish",
+    "workflow:read",
+    "workflow:share",
+    "workflow:unpublish",
+    "workflow:unshare",
+    "workflow:update"
+  ],
+  "canExecute": true,
+  "connections": {
+    "Entregar fila a cada minuto": {
+      "main": [
+        [
+          {
+            "node": "Reservar mensagens pendentes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reservar mensagens pendentes": {
+      "main": [
+        [
+          {
+            "node": "Conferir pausa antes do envio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Conferir pausa antes do envio": {
+      "main": [
+        [
+          {
+            "node": "Enviar mensagem no WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar mensagem no WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Registrar resultado da entrega",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodes": [
+    {
+      "id": "25bfe54a-1a1e-49aa-81c2-b78c166bd459",
+      "name": "Entregar fila a cada minuto",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "2ca9fe00-47b0-4017-b058-e2f4c597b6cb",
+      "name": "Reservar mensagens pendentes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        224,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://urgwupjlpoerkdkfunti.supabase.co/functions/v1/orbita-automation",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({action:\"claim\",data:{channel:\"whatsapp\"}}) }}",
+        "options": {
+          "timeout": 15000
+        }
+      }
+    },
+    {
+      "id": "b66ab246-2318-48be-9e3a-cceec83b2986",
+      "name": "Conferir pausa antes do envio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://urgwupjlpoerkdkfunti.supabase.co/functions/v1/orbita-automation",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({action:\"authorize\",data:{id:$json.id}}) }}",
+        "options": {
+          "timeout": 15000
+        }
+      }
+    },
+    {
+      "id": "6be14145-5850-4501-a832-faf2acf06255",
+      "name": "Enviar mensagem no WhatsApp",
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1.1,
+      "position": [
+        672,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "phoneNumberId": "<__PLACEHOLDER_VALUE__ID do número da empresa no Meta__>",
+        "recipientPhoneNumber": "={{ $json.phone }}",
+        "messageType": "text",
+        "textBody": "={{ $json.body }}",
+        "additionalFields": {
+          "previewUrl": false
+        }
+      },
+      "onError": "continueRegularOutput",
+      "webhookId": "76603462-8842-432b-8ca9-346d179a6708"
+    },
+    {
+      "id": "4f538449-d768-4f05-8b5b-862ddfa18303",
+      "name": "Registrar resultado da entrega",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://urgwupjlpoerkdkfunti.supabase.co/functions/v1/orbita-automation",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({action:\"ack\",data:{id:$(\"Conferir pausa antes do envio\").item.json.id,ok:!$json.error,provider_id:String($json.result?.message_id ?? $json.message_id ?? $json.messages?.[0]?.id ?? \"\"),error:$json.error?.message ?? $json.error ?? null}}) }}",
+        "options": {
+          "timeout": 15000
+        }
+      }
+    }
+  ],
+  "nodeGroups": [
+    {
+      "id": "66c68b3a-424a-4986-a522-ac02c3bb5076",
+      "name": "Entrega controlada",
+      "nodeNames": [
+        "Reservar mensagens pendentes",
+        "Conferir pausa antes do envio",
+        "Enviar mensagem no WhatsApp",
+        "Registrar resultado da entrega"
+      ],
+      "description": "Janela de 24h validada no banco. Fora da janela, falha visível para tratamento humano."
+    }
+  ],
+  "activeVersion": null,
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  }
+}

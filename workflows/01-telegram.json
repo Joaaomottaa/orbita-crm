@@ -1,0 +1,307 @@
+{
+  "id": "4N2NM1PNejFjAVma",
+  "name": "Órbita | 01 · Entrada Telegram",
+  "active": false,
+  "isArchived": false,
+  "versionId": "25d4a297-dbf4-4d36-92be-cbe51a7a58f4",
+  "activeVersionId": null,
+  "triggerCount": 0,
+  "nodeCount": 7,
+  "createdAt": "2026-09-27T14:13:17.388Z",
+  "updatedAt": "2026-09-27T14:13:17.388Z",
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": true
+  },
+  "tags": [],
+  "parentFolderId": null,
+  "description": "Contato próprio, telefone E.164 e evento único. Histórico é salvo antes da IA. Só processa se a IA estiver autorizada. Duplicatas e modo humano param aqui.",
+  "scopes": [
+    "execution:reveal",
+    "workflow:create",
+    "workflow:delete",
+    "workflow:disableRedaction",
+    "workflow:enableRedaction",
+    "workflow:execute",
+    "workflow:execute-chat",
+    "workflow:export",
+    "workflow:import",
+    "workflow:list",
+    "workflow:move",
+    "workflow:publish",
+    "workflow:read",
+    "workflow:share",
+    "workflow:unpublish",
+    "workflow:unshare",
+    "workflow:update"
+  ],
+  "canExecute": true,
+  "connections": {
+    "Mensagem no Telegram": {
+      "main": [
+        [
+          {
+            "node": "Identificar contato próprio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Identificar contato próprio": {
+      "main": [
+        [
+          {
+            "node": "Registrar mensagem no CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar mensagem no CRM": {
+      "main": [
+        [
+          {
+            "node": "Precisa compartilhar telefone?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Precisa compartilhar telefone?": {
+      "main": [
+        [
+          {
+            "node": "Pedir contato no Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Somente atendimento automático",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Somente atendimento automático": {
+      "main": [
+        [
+          {
+            "node": "Qualificar no fluxo central",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "nodes": [
+    {
+      "id": "2f446d79-c6d1-4254-acbc-b5d06f977745",
+      "name": "Mensagem no Telegram",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        0,
+        96
+      ],
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "webhookId": "396b5b87-1ddb-421b-a733-2eaebfcc0e98"
+    },
+    {
+      "id": "a9c3ff01-c3cc-44d0-a442-66b60dbae5dc",
+      "name": "Identificar contato próprio",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        96
+      ],
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const u=$json,m=u.message;if(!m||m.chat?.type!=='private'||m.from?.is_bot)return null;\nconst c=m.contact; const own=c&&String(c.user_id)===String(m.from.id);\nconst phone=own?'+'+String(c.phone_number).replace(/\\D/g,''):null;\nreturn {json:{channel:'telegram',external_id:String(m.chat.id),event_key:'tg:'+String(u.update_id),phone,name:own?[c.first_name,c.last_name].filter(Boolean).join(' '):null,text:m.text||(own?'[Contato compartilhado]':'[Mensagem sem texto; pedir texto ao lead]')}};"
+      }
+    },
+    {
+      "id": "b9df0328-f9df-4c8c-8ae1-22ec1a86ee1e",
+      "name": "Registrar mensagem no CRM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        448,
+        96
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://urgwupjlpoerkdkfunti.supabase.co/functions/v1/orbita-automation",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpTemplatedCustomAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({action:\"ingest\",data:$json}) }}",
+        "options": {
+          "timeout": 15000
+        }
+      }
+    },
+    {
+      "id": "943aeb01-218e-4045-a51b-eac9745f2b21",
+      "name": "Precisa compartilhar telefone?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        672,
+        96
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "request_contact",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "7faf7b95-dfea-442d-8899-f2b6ac1fff63",
+      "name": "Pedir contato no Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        896,
+        0
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.external_id }}",
+        "text": "Olá! Sou a assistente virtual da Órbita. Para identificar seu cadastro e não duplicar contatos, compartilhe seu telefone no botão abaixo. Usaremos os dados para este atendimento comercial. Você pode pedir para parar ou falar com uma pessoa a qualquer momento.",
+        "replyMarkup": "replyKeyboard",
+        "replyKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Compartilhar meu telefone",
+                    "additionalFields": {
+                      "request_contact": true
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "replyKeyboardOptions": {
+          "resize_keyboard": true,
+          "one_time_keyboard": true
+        },
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "webhookId": "8f81b994-adf6-44d6-8860-213350ec52d9"
+    },
+    {
+      "id": "abf50350-ddc3-408d-8241-56d59c178e2f",
+      "name": "Somente atendimento automático",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.3,
+      "position": [
+        896,
+        192
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "combinator": "and",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.action }}",
+              "rightValue": "qualify",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "0fe87dde-1233-47ce-a2a6-edb9ff1b4326",
+      "name": "Qualificar no fluxo central",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        1120,
+        192
+      ],
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "i8MOp5VaXEcng8SZ"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      }
+    }
+  ],
+  "nodeGroups": [
+    {
+      "id": "757a69e6-3fc5-431a-92c2-0aa89e2078f8",
+      "name": "Identificar e registrar",
+      "nodeNames": [
+        "Identificar contato próprio",
+        "Registrar mensagem no CRM"
+      ],
+      "description": "Contato próprio, telefone E.164 e evento único. Histórico é salvo antes da IA."
+    },
+    {
+      "id": "657371c9-052a-4b64-9082-464786924da8",
+      "name": "Qualificação",
+      "nodeNames": [
+        "Somente atendimento automático",
+        "Qualificar no fluxo central"
+      ],
+      "description": "Só processa se a IA estiver autorizada. Duplicatas e modo humano param aqui."
+    }
+  ],
+  "activeVersion": null,
+  "meta": {
+    "aiBuilderAssisted": true,
+    "builderVariant": "mcp"
+  }
+}
