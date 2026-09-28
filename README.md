@@ -126,3 +126,11 @@ A memória de conversa do n8n (Postgres Chat Memory) fica no mesmo Supabase, no 
 - **Link direto**: `/?lead=<id>` abre a conversa após o login (usado pelo botão do Slack).
 - **Fluxo 03 · Lead quente → funcionário**: IA sai da conversa e o responsável recebe DM no Slack em Block Kit (dados, motivos, resumo, últimas mensagens e botão para a conversa).
 - Migrações aplicadas pelo MCP do Supabase; o histórico completo está em Supabase → Database → Migrations.
+
+## Apresentação interativa da jornada (v6)
+
+“Fluxo & decisões” e `/fluxo.html` compartilham o componente `dist/journey.js` e o estilo `dist/journey.css`. Seis etapas mostram entrada, contexto, IA, regras, agenda e passagem ao humano; cenários recortam pedido de reunião e lead quente. Há reprodução, pausa, avanço manual, seleção de etapa e modo expandido. A animação respeita a preferência de movimento reduzido e para em abas ocultas. O refresh do CRM preserva a apresentação.
+
+É uma narrativa ilustrativa: não lê conversas de clientes, não envia mensagens, não executa workflows e não representa métricas reais. Os painéis de conexões, responsabilidades e riscos explicam a arquitetura existente. Agenda e handoff são caminhos condicionais, não uma sequência obrigatória para todo lead.
+
+Referência pesquisada: https://www.opens.com.br/ — movimento para explicar a jornada, organização por capacidades e contexto para o operador. Implementação original do Órbita, com percurso sequencial, paleta azul/menta, narrativa por etapa e controles de apresentação. Nenhum ativo, texto promocional ou estatística comercial da referência foi reutilizado.
