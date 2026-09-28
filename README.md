@@ -134,3 +134,7 @@ A memória de conversa do n8n (Postgres Chat Memory) fica no mesmo Supabase, no 
 É uma narrativa ilustrativa: não lê conversas de clientes, não envia mensagens, não executa workflows e não representa métricas reais. Os painéis de conexões, responsabilidades e riscos explicam a arquitetura existente. Agenda e handoff são caminhos condicionais, não uma sequência obrigatória para todo lead.
 
 Referência pesquisada: https://www.opens.com.br/ — movimento para explicar a jornada, organização por capacidades e contexto para o operador. Implementação original do Órbita, com percurso sequencial, paleta azul/menta, narrativa por etapa e controles de apresentação. Nenhum ativo, texto promocional ou estatística comercial da referência foi reutilizado.
+
+## Relatórios ilustrativos (v7)
+
+Nova guia Relatórios, com Chats e Chamadas e experiência. Dados locais fixos em reports.js: 36 chats e 24 chamadas fictícias distribuídos entre Ana, Bruno e Carla, com período de referência 28/09/2026. Filtros de 7/30 dias e pessoa recalculam cartões, gráficos e comparativo a partir dos mesmos registros. Chats mostram SLA de primeira resposta em até 2 minutos, volume, tempo ativo, espera, participação humana e estados. Chamadas mostram atendidas, abandonadas, não atendidas, TMA/TME, CSAT, NPS e taxa de resposta às pesquisas. Metas, bases de cálculo e caráter ilustrativo estão explícitos. Não há integração de telefonia/pesquisas, novas tabelas, chamadas de API ou gravações feitas pelo módulo; Visão geral mantém seus indicadores reais separados.
