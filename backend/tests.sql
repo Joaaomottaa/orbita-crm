@@ -56,7 +56,7 @@ end $$;
 set local role authenticated;
 select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000001","email":"intruso@example.invalid","role":"authenticated"}',true);
 do $$ begin assert not public.orbita_is_operator();assert not exists(select 1 from public.orbita_leads);end $$;
-select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000001","email":"l2mortal01@gmail.com","role":"authenticated"}',true);
+select set_config('request.jwt.claims','{"sub":"d3702db6-18ab-410a-9a1c-41459b31db67","email":"l2mortal01@gmail.com","role":"authenticated"}',true);
 do $$ begin assert public.orbita_is_operator();assert exists(select 1 from public.orbita_leads where phone='+5511999988771');end $$;
 reset role;
 insert into orbita_test_results values('RLS bloqueia intruso autenticado e autoriza administrador',true);

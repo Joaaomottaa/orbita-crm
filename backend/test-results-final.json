@@ -1,0 +1,11 @@
+{
+  "passed": [
+    "Funcionário vê ocupação de slots sem dados de colegas",
+    "Funcionário não edita agenda",
+    "Admin edita disponibilidade válida",
+    "Funcionário não cria usuários",
+    "API do CRM rejeita visitante",
+    "Filtro de responsável limita gráficos a 12 leads",
+    "Dados reais excluem demonstração"
+  ]
+}

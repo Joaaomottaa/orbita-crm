@@ -7,10 +7,10 @@ begin perform public.orbita_simulator_enqueue('+9991234567890','Olá','00000000-
 exception when others then if sqlerrm='Intruso aceito' then raise;end if;end;
 assert not exists(select 1 from public.orbita_simulator_requests);
 end $$;
-select set_config('request.jwt.claims','{"sub":"00000000-0000-0000-0000-000000000001","email":"l2mortal01@gmail.com","role":"authenticated"}',true);
+select set_config('request.jwt.claims','{"sub":"d3702db6-18ab-410a-9a1c-41459b31db67","email":"l2mortal01@gmail.com","role":"authenticated"}',true);
 do $$ begin
-begin perform public.orbita_simulator_enqueue('+5511999988771','Olá','00000000-0000-0000-0000-000000000101');raise exception 'Telefone real aceito';
-exception when others then if sqlerrm='Telefone real aceito' then raise;end if;end;
+begin perform public.orbita_simulator_enqueue('11999988771','Olá','00000000-0000-0000-0000-000000000101');raise exception 'Telefone sem formato aceito';
+exception when others then if sqlerrm='Telefone sem formato aceito' then raise;end if;end;
 perform public.orbita_simulator_enqueue('+9991234567890','Meu nome é João Paulo. Quero automatizar o atendimento da empresa este mês.','00000000-0000-0000-0000-000000000101');
 perform public.orbita_simulator_enqueue('+9991234567890','Meu nome é João Paulo. Quero automatizar o atendimento da empresa este mês.','00000000-0000-0000-0000-000000000101');
 assert (select count(*)=1 from public.orbita_simulator_requests where phone='+9991234567890');

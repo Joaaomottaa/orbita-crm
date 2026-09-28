@@ -1,14 +1,14 @@
 {
   "id": "DS09OVYC0j9mR1mU",
   "name": "Órbita | 02 · Entregar respostas — Telegram",
-  "active": false,
+  "active": true,
   "isArchived": false,
-  "versionId": "dbe30b57-a897-4762-be75-8e1badc5f613",
-  "activeVersionId": null,
-  "triggerCount": 0,
+  "versionId": "b454a616-621a-463f-bbce-02c0c88226c7",
+  "activeVersionId": "b454a616-621a-463f-bbce-02c0c88226c7",
+  "triggerCount": 1,
   "nodeCount": 5,
   "createdAt": "2026-09-27T14:13:18.126Z",
-  "updatedAt": "2026-09-27T20:43:04.845Z",
+  "updatedAt": "2026-09-27T21:16:04.081Z",
   "settings": {
     "executionOrder": "v1",
     "availableInMCP": true,
@@ -109,7 +109,7 @@
         "method": "POST",
         "url": "https://urgwupjlpoerkdkfunti.supabase.co/functions/v1/orbita-automation",
         "authentication": "genericCredentialType",
-        "genericAuthType": "httpTemplatedCustomAuth",
+        "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({action:\"claim\",data:{channel:\"telegram\"}}) }}",
@@ -124,14 +124,20 @@
       "position": [
         208,
         -48
-      ]
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "7KKnO1RySs3959fe",
+          "name": "Órbita Integração"
+        }
+      }
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://urgwupjlpoerkdkfunti.supabase.co/functions/v1/orbita-automation",
         "authentication": "genericCredentialType",
-        "genericAuthType": "httpTemplatedCustomAuth",
+        "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({action:\"authorize\",data:{id:$json.id}}) }}",
@@ -146,7 +152,13 @@
       "position": [
         432,
         -48
-      ]
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "7KKnO1RySs3959fe",
+          "name": "Órbita Integração"
+        }
+      }
     },
     {
       "parameters": {
@@ -170,14 +182,20 @@
         -48
       ],
       "webhookId": "546dcfc6-979e-4625-805e-0750fccc09e2",
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "telegramApi": {
+          "id": "3V7LdIGBtL9SFNxt",
+          "name": "Telegram account"
+        }
+      }
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://urgwupjlpoerkdkfunti.supabase.co/functions/v1/orbita-automation",
         "authentication": "genericCredentialType",
-        "genericAuthType": "httpTemplatedCustomAuth",
+        "genericAuthType": "httpHeaderAuth",
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({action:\"ack\",data:{id:$(\"Conferir pausa antes do envio\").item.json.id,ok:!$json.error,provider_id:String($json.result?.message_id ?? $json.message_id ?? $json.messages?.[0]?.id ?? \"\"),error:$json.error?.message ?? $json.error ?? null}}) }}",
@@ -192,7 +210,13 @@
       "position": [
         880,
         -48
-      ]
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "7KKnO1RySs3959fe",
+          "name": "Órbita Integração"
+        }
+      }
     }
   ],
   "nodeGroups": [
@@ -208,7 +232,9 @@
       "description": "Reserva a fila, revalida intervenção e registra sucesso ou falha. Não repete envio incerto."
     }
   ],
-  "activeVersion": null,
+  "activeVersion": {
+    "sameAsDraft": true
+  },
   "meta": {
     "aiBuilderAssisted": true,
     "builderVariant": "mcp"

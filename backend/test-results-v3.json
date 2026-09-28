@@ -1,0 +1,21 @@
+{
+  "passed": [
+    "Funcionários veem somente 12 leads próprios",
+    "Acesso direto ao lead de colega é bloqueado",
+    "Funcionário não pode assumir lead alheio",
+    "Funcionário não altera regras",
+    "Funcionário não remove disponibilidade",
+    "Elevação direta de privilégio bloqueada",
+    "Reatribuição direta de lead bloqueada",
+    "Relatório do funcionário contém apenas sua carteira",
+    "Administrador vê toda equipe e métricas",
+    "Visitante não lê leads",
+    "Simulador não altera carteira alheia",
+    "Funcionário pode pausar a IA própria",
+    "Funcionário pode retomar IA própria",
+    "Administrador transfere lead",
+    "Acesso anterior revogado após transferência",
+    "Administrador desativa usuário",
+    "Sessão antiga de usuário desativado perde acesso"
+  ]
+}
