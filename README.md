@@ -4,7 +4,7 @@ Aplicação própria para uma empresa de automação e IA. Cadastro, conversa, q
 
 ## Acessar e demonstrar
 
-- [Abrir CRM](https://orbita-crm-opens-joao.limalipe355.chatgpt.site/).
+- CRM hospedado na Vercel (projeto `orbita-crm`, pasta `dist/`, sem build). Endereço antigo: https://orbita-crm-opens-joao.limalipe355.chatgpt.site/.
 - Administrador: l2mortal01@gmail.com. Credenciais iniciais estão no arquivo local `../ACESSOS-PRIVADOS.txt`, fora deste projeto e do ZIP.
 - Três funcionários: Ana Martins, Bruno Almeida e Carla Santos, com 12 leads fictícios cada. Use o filtro de demonstração para comparar carteiras. O administrador também possui o lead utilizado no teste integrado.
 - Entre, abra Simulador WhatsApp, informe um telefone de teste com código do país e converse. Exemplo: nome/empresa → necessidade de automação → prazo neste mês → decisor → opção de horário.
@@ -16,7 +16,7 @@ Aplicação própria para uma empresa de automação e IA. Cadastro, conversa, q
 | Fluxo ativo | Responsabilidade |
 |---|---|
 | [01 · Atendimento](https://autoconfi.app.n8n.cloud/workflow/i8MOp5VaXEcng8SZ) | Telegram ou webhook do simulador → identificar → verificar modo → Claude → validar → atualizar perfil, pontuação, agenda e tarefa humana |
-| [02 · Entrega Telegram](https://autoconfi.app.n8n.cloud/workflow/DS09OVYC0j9mR1mU) | A cada minuto, reservar mensagem → conferir pausa/versão → enviar → registrar entrega |
+| [02 · Entrega Telegram](https://autoconfi.app.n8n.cloud/workflow/DS09OVYC0j9mR1mU) | Resposta pronta → webhook → reservar essa mensagem → conferir pausa/versão → enviar → registrar entrega |
 
 O primeiro possui quatro grupos visuais. Telegram e simulador usam a mesma lógica. Os três adaptadores antigos permanecem arquivados. WhatsApp oficial é uma integração futura; o simulador reproduz a experiência dentro do CRM.
 
@@ -44,12 +44,12 @@ Aderência: 35 pontos; necessidade: 25; prazo até 30 dias: 25; decisão: 15. Qu
 
 Lead quente abre tarefa com SLA e recebe opções de agenda. A reserva é transacional e bloqueia conflitos de horário. Após confirmação, o lead quente passa ao humano. Pedido explícito de humano, pausa e opt-out interrompem a IA. O operador pode intervir a qualquer momento.
 
-Telefone E.164 é a chave do lead. Telegram exige compartilhar o contato próprio e valida a autoria. Simulador e contatos reais não podem reutilizar a mesma identidade indevidamente. Horários fictícios permanecem separados dos reais. Nenhum link de videoconferência é criado automaticamente. Editar a agenda não notifica o cliente automaticamente; a equipe precisa comunicar a mudança.
+No Telegram, o lead é identificado pelo chat_id (`tg:<chat_id>`), sem pedir telefone no início. Se a pessoa informar um número na conversa, ele fica em `contact_phone`; se compartilhar o próprio contato pelo botão, o telefone E.164 vira a chave. No simulador, a chave continua sendo o telefone E.164. Simulador e contatos reais não podem reutilizar a mesma identidade indevidamente. Horários fictícios permanecem separados dos reais. Nenhum link de videoconferência é criado automaticamente. Editar a agenda não notifica o cliente automaticamente; a equipe precisa comunicar a mudança.
 
 ## Arquitetura e arquivos
 
 - `dist/`: aplicação estática e `fluxo.html` para apresentação/impressão.
-- `workflows/`: exportações atuais dos dois workflows. Credenciais contêm referências, sem tokens; remapeie ao importar em outra instância.
+- `workflows/`: exportações de 27/09 dos dois workflows (a versão em produção está no n8n: memória Postgres por chat_id e validação do JSON no nó de código). Credenciais contêm referências, sem tokens; remapeie ao importar em outra instância.
 - `backend/index.ts`: Edge Function orbita-automation, protegida pela chave de integração.
 - `backend/crm-api.ts`: Edge Function orbita-crm, valida usuário autenticado e acesso; despacha simulação e cria contas por ação administrativa.
 - SQL: schema.sql → 002-delivery-and-guards.sql → 003-qualification.sql → simulator.sql → simulator-calendar.sql → team-access.sql → team-metrics.sql → team-guards.sql → team-calendar.sql.
@@ -84,7 +84,7 @@ Os SQLs documentam a instalação e evolução; o projeto remoto já está atual
 | Entrega incerta | Estado para conferência, sem reenvio cego |
 | Dados de outro funcionário | RLS, funções autorizadas e testes com contas distintas |
 | Lead quente sem resposta | Tarefa com SLA; não há escalonamento externo automático nesta versão |
-| Custo de execução | Um agendador de entrega a cada minuto representa cerca de 43.200 execuções em 30 dias; o simulador usa evento. Planejar entrega por evento ou desligar testes ociosos conforme o plano n8n |
+| Custo de execução | Sem agendador: uma execução de atendimento por mensagem recebida e uma de entrega por resposta Telegram. Mensagens do vendedor também acionam a entrega; nenhuma execução periódica com fila vazia. |
 | Privacidade e escala | Definir retenção, exclusão, backup e base legal. Tela limita cargas a 1.000 registros/2.000 mensagens; paginação e monitoramento precisam evoluir para volume maior |
 | Token no chat compartilhado de referência | Rotacionar o token MCP exposto naquela referência; ele não foi incluído no projeto |
 
@@ -95,3 +95,25 @@ Os SQLs documentam a instalação e evolução; o projeto remoto já está atual
 Defesa sugerida: “O cliente precisa transformar conversas em oportunidades acompanhadas. A ferramenta reúne o processo específico dele, com menos telas e regras próprias. Comparo implantação, infraestrutura, IA e manutenção com as licenças necessárias para dimensionar o custo total; a economia precisa ser medida no piloto.”
 
 Apresentação em cinco minutos: mostre as três carteiras → abra o desenho do fluxo → converse no simulador → confirme reunião e intervenção humana → compare os indicadores → explique os riscos e o que falta validar no canal externo.
+
+## Correção da execução 378 — entrega por evento
+
+A execução 378 parou em Reservar mensagens pendentes com ExpressionError: invalid syntax no jsonBody. Corrigidas as expressões de entrega e a de encaminhamento de falha do atendimento.
+
+O relógio do fluxo 02 foi removido. Um trigger AFTER INSERT em orbita_messages aciona o webhook autenticado somente para mensagens Telegram de saída com status pending. pg_net envia após a transação confirmar, sem bloquear o atendimento. Não dispara para mensagens recebidas nem para o simulador. Referência: https://supabase.com/docs/guides/database/webhooks
+
+O evento transporta somente o UUID da mensagem. A API reserva aquela mensagem com bloqueio de linha e revalida pausa/versão antes de entregar. Eventos duplicados não reservam mensagens já enviadas/em envio. A origem pode ser IA, sistema (agenda) ou vendedor do CRM; portanto não depende de nova entrada do Telegram.
+
+Se o webhook estiver indisponível, a mensagem continua persistida. Após 30 segundos, Conversas permite “Retomar envio pendente”, restrito à carteira autorizada. Mensagem em envio sem confirmação pede conferência no Telegram e não é reenviada automaticamente. Não há agendador de recuperação oculto. Fonte: backend/event-delivery.sql, aplicada após as migrações anteriores. Logs de despacho ficam no esquema privado.
+
+Teste técnico de entrega: mensagens de bot e humano acionaram webhook e percorreram reserva, autorização, API Telegram e confirmação no banco. Usou-se destino 0 (inválido de propósito, sem destinatário externo): a API respondeu chat not found, registrado como failed. Esse teste comprova execução e tratamento de erro, mas não recebimento em uma conta real.
+
+## Hospedagem na Vercel
+
+- `vercel.json` publica `dist/` como site estático, sem etapa de build.
+- Depois do primeiro deploy, incluir o domínio da Vercel em Supabase → Authentication → URL Configuration (Site URL e Redirect URLs) para a recuperação de senha funcionar.
+- A Edge Function `orbita-crm` aceita chamadas do domínio `orbita-crm*.vercel.app` (CORS), além do endereço antigo.
+
+## Memória da IA
+
+A memória de conversa do n8n (Postgres Chat Memory) fica no mesmo Supabase, no schema `n8n_memoria`, tabela `n8n_chat_histories`, acessada pelo usuário restrito `n8n_memoria` (sem acesso às tabelas do CRM). A sessão é o identificador do lead (`tg:<chat_id>`).

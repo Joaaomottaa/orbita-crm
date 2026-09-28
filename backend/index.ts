@@ -12,6 +12,7 @@ Deno.serve(async req=>{
   else if(action==='simulator_process')result=await db.rpc('orbita_simulator_process',{p_id:data.id});
   else if(action==='simulator_next')result=await db.rpc('orbita_simulator_next');
   else if(action==='commit')result=await db.rpc('orbita_commit',{p:data});
+  else if(action==='claim_message')result=await db.rpc('orbita_claim_message',{p_id:data.id});
   else if(action==='claim')result=await db.rpc('orbita_claim_channel',{p_channel:data.channel});
   else if(action==='ack')result=await db.rpc('orbita_ack',{p:data});
   else if(action==='authorize')result=await db.rpc('orbita_authorize_delivery',{p_id:data.id});
