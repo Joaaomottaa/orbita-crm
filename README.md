@@ -117,3 +117,12 @@ Teste técnico de entrega: mensagens de bot e humano acionaram webhook e percorr
 ## Memória da IA
 
 A memória de conversa do n8n (Postgres Chat Memory) fica no mesmo Supabase, no schema `n8n_memoria`, tabela `n8n_chat_histories`, acessada pelo usuário restrito `n8n_memoria` (sem acesso às tabelas do CRM). A sessão é o identificador do lead (`tg:<chat_id>`).
+
+## Versão 5 (28/09)
+
+- **Regras de qualificação editáveis** (Configurações → Qualificação transparente): criar, editar, ativar/desativar, reordenar e excluir. Cada regra define dado analisado, condição, pontos, se é obrigatória para quente e se conta para a nota de quente. Tabela `orbita_score_rules`; o `orbita_commit` lê as regras a cada mensagem.
+- **Etapas do funil editáveis pelo admin** (Funil → ⚙ Editar etapas): renomear, cor, ordem, criar, excluir movendo os leads e alerta de lead parado (como o "rotting" do Pipedrive). Tabela `orbita_stages`; as 6 etapas usadas pela automação não podem ser excluídas.
+- **Filtros**: Funil (canal, atendimento, data de entrada, pontuação, aguardando humano), Conversas (responsável, temperatura, atendimento, data da última mensagem com intervalo, aguardando humano, ordenação por atividade) e Agenda (responsável, lead, livres/reservados, reais/teste, período).
+- **Link direto**: `/?lead=<id>` abre a conversa após o login (usado pelo botão do Slack).
+- **Fluxo 03 · Lead quente → funcionário**: IA sai da conversa e o responsável recebe DM no Slack em Block Kit (dados, motivos, resumo, últimas mensagens e botão para a conversa).
+- Migrações aplicadas pelo MCP do Supabase; o histórico completo está em Supabase → Database → Migrations.

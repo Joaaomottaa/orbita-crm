@@ -116,6 +116,268 @@ simSend=async text=>{text=text.trim();if(!text||simBusy||!simNumber)return;simBu
 const simulatorOld=simulator;
 simulator=()=>{if(!simNumber){document.querySelector('#surface').innerHTML=`<div class="sim-start panel"><span class="badge green">IA REAL · ANTHROPIC NO N8N</span><h2>Qual número vamos simular?</h2><p>O número identifica este lead no CRM. A conversa fica registrada no funil e pode ser assumida por um vendedor.</p><form id="sim-start"><label>Telefone com código do país<input name="phone" type="tel" placeholder="+55 11 99999-0000" autocomplete="off" required></label><button class="primary">Iniciar conversa</button></form><small>Use um número de teste. Não enviamos mensagens ao WhatsApp real e não substituímos contatos reais já cadastrados.</small></div>`;document.querySelector('#sim-start').onsubmit=e=>{e.preventDefault();let n=String(new FormData(e.target).get('phone')).replace(/[^\d+]/g,'');if(!n.startsWith('+'))n='+'+n;if(!/^\+[1-9]\d{7,14}$/.test(n)){toast('Informe o código do país e o número completo.');return}simNumber=n;sessionStorage.setItem('orbita-number',n);simulator()};return}simulatorOld();const top=document.querySelector('.sim-toolbar');if(top){const s=top.querySelector('span');if(s)s.textContent='IA real · Anthropic + n8n'}document.querySelectorAll('.sim-id').forEach(e=>e.textContent='Número de teste: '+simNumber);const wait=document.querySelector('.wa-wait small');if(wait)wait.textContent='A mensagem já foi enviada à automação.';const last=simRequests.find(r=>r.phone===simNumber);if(last&&['pending','processing'].includes(last.status)&&new Date(last.created_at)<new Date(Date.now()-180000)){document.querySelector('.wa-wait')?.remove();document.querySelector('.wa-compose button').disabled=false;document.querySelector('.phone-messages').insertAdjacentHTML('beforeend','<div class="sim-error">A resposta demorou além do esperado. Verifique a execução no n8n antes de reenviar.</div>');document.querySelector('#sim-send').onsubmit=e=>{e.preventDefault();simSend(document.querySelector('#sim-message').value)}}};
 async function startApp(){demo=false;view=location.hash==='#simulador'?'simulator':'kanban';app.innerHTML='<div class="session-loading">Órbita · Carregando sua operação…</div>';try{await initDb();db.auth.onAuthStateChange((event)=>{if(event==='PASSWORD_RECOVERY'){recovery=true;setTimeout(()=>authPage('reset'),0)}if(event==='SIGNED_OUT'&&me){me=null;session=null;authPage()}});const {data}=await db.auth.getSession();if(data.session&&(recovery||new URLSearchParams(location.search).has('recovery'))){session=data.session;recovery=true;authPage('reset');return}await activate()}catch(e){authPage('login',failText(e))}}
+
+/* ===== Órbita v5: regras editáveis, etapas editáveis, filtros, link direto para o lead ===== */
+let scoreRules=[],allStages=[],metaLoaded=false;
+let F={channel:'',mode:'',period:'',priority:false,minScore:''};
+let IF={q:'',owner:'',temp:'',mode:'',period:'',from:'',to:'',waiting:false};
+let AF={owner:'',q:'',status:'',kind:'',days:''};
+let pendingLead=new URLSearchParams(location.search).get('lead');
+const RULE_FIELDS={
+ fit:{label:'Aderência (conclusão da IA)',type:'bool'},
+ meeting_intent:{label:'Pediu reunião',type:'bool'},
+ need:{label:'Necessidade',type:'text'},
+ company:{label:'Empresa',type:'text'},
+ email:{label:'E-mail',type:'text'},
+ name:{label:'Nome',type:'text'},
+ urgency:{label:'Prazo',type:'enum',values:[['30_days','Até 30 dias'],['later','Mais para frente'],['unknown','Não sabe']]},
+ decision:{label:'Decisão',type:'enum',values:[['decision_maker','É quem decide'],['involved','Participa da decisão'],['unknown','Não informado']]}
+};
+const DAY=86400000;
+const lastAt=l=>{let t=0;for(const m of messages)if(m.phone===l.phone){const v=+new Date(m.created_at);if(v>t)t=v}return t||+new Date(l.last_inbound_at||l.updated_at||l.created_at||0)};
+const waitingHuman=l=>(l.handoff_requested_at&&l.mode!=='human'&&l.mode!=='optout')||tasks.some(t=>t.phone===l.phone&&t.status==='open');
+const inPeriod=(ts,period,from,to)=>{if(period==='custom'){if(from&&ts<+new Date(from+'T00:00:00-03:00'))return false;if(to&&ts>+new Date(to+'T23:59:59-03:00'))return false;return true}if(!period)return true;if(period==='today')return ts>=+new Date(new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'})+'T00:00:00-03:00');return ts>=Date.now()-Number(period)*DAY};
+const opt=(v,t,cur)=>`<option value="${esc(v)}" ${String(v)===String(cur)?'selected':''}>${esc(t)}</option>`;
+const ownerSelect=(id,cur)=>isAdmin()?`<select id="${id}" aria-label="Responsável">${opt('','Toda a equipe',cur)}${members.map(m=>opt(m.user_id,m.name,cur)).join('')}</select>`:'';
+
+async function loadMeta(){
+ if(!db||!session)return;
+ const [r,s]=await Promise.all([db.from('orbita_score_rules').select('*').order('position'),db.from('orbita_stages').select('*').order('position')]);
+ if(!r.error)scoreRules=r.data||[];
+ if(!s.error&&s.data?.length){allStages=s.data;stages.splice(0,stages.length,...allStages.filter(x=>x.kind!=='lost').map(x=>[x.key,x.label,x.color]));}
+ metaLoaded=true;
+}
+const refreshV4=refresh;
+refresh=async()=>{
+ try{await loadMeta()}catch(e){}
+ const out=await refreshV4();
+ if(pendingLead&&me&&leads.length){
+  const ph=pendingLead;pendingLead=null;history.replaceState(null,'',location.pathname);
+  if(leads.some(l=>l.phone===ph)){selected=ph;view='inbox';render()}else toast('Este lead não está na sua carteira.');
+ }
+ return out;
+};
+
+/* ---------- Funil: filtros extras ---------- */
+filtered=()=>leads.filter(l=>
+ (!ownerFilter||l.assigned_to===ownerFilter)&&(!temperature||l.temperature===temperature)&&(dataFilter==='all'||l.is_demo===(dataFilter==='demo'))&&
+ (!F.channel||l.channel===F.channel)&&(!F.mode||l.mode===F.mode)&&(!F.priority||waitingHuman(l))&&(!F.minScore||(l.score||0)>=Number(F.minScore))&&
+ inPeriod(+new Date(l.created_at||0),F.period)&&
+ [l.name,l.company,l.phone,l.contact_phone,l.email].join(' ').toLowerCase().includes(search.toLowerCase()));
+const kanbanV4=kanban;
+kanban=()=>{
+ kanbanV4();
+ const bar=document.querySelector('.toolbar');if(!bar)return;
+ const active=[F.channel,F.mode,F.period,F.minScore,F.priority?'1':'',temperature,ownerFilter,search,dataFilter!=='all'?'1':''].filter(Boolean).length;
+ bar.insertAdjacentHTML('afterend',`<div class="toolbar filters2">
+  <select id="f-channel" aria-label="Canal">${opt('','Todos os canais',F.channel)}${[['telegram','Telegram'],['whatsapp','WhatsApp'],['demo','Simulador'],['manual','Cadastro manual']].map(a=>opt(a[0],a[1],F.channel)).join('')}</select>
+  <select id="f-mode" aria-label="Atendimento">${opt('','Qualquer atendimento',F.mode)}${[['bot','IA atendendo'],['human','Com humano'],['paused','IA pausada'],['optout','Encerrados (opt-out)']].map(a=>opt(a[0],a[1],F.mode)).join('')}</select>
+  <select id="f-period" aria-label="Entrada">${opt('','Entrada: qualquer data',F.period)}${[['today','Entraram hoje'],['7','Últimos 7 dias'],['30','Últimos 30 dias'],['90','Últimos 90 dias']].map(a=>opt(a[0],a[1],F.period)).join('')}</select>
+  <select id="f-score" aria-label="Pontuação mínima">${opt('','Qualquer pontuação',F.minScore)}${[['40','40+ pontos'],['70','70+ pontos']].map(a=>opt(a[0],a[1],F.minScore)).join('')}</select>
+  <label class="check"><input type="checkbox" id="f-priority" ${F.priority?'checked':''}> Só aguardando humano</label>
+  ${active?`<button id="f-clear" class="link">Limpar filtros (${active})</button>`:''}
+  ${isAdmin()?'<button id="edit-stages" class="right">⚙ Editar etapas</button>':''}
+ </div>`);
+ const set=(id,k,ev='onchange')=>{const el=document.querySelector(id);if(el)el[ev]=e=>{F[k]=e.target.type==='checkbox'?e.target.checked:e.target.value;kanban()}};
+ set('#f-channel','channel');set('#f-mode','mode');set('#f-period','period');set('#f-score','minScore');set('#f-priority','priority');
+ document.querySelector('#f-clear')?.addEventListener('click',()=>{F={channel:'',mode:'',period:'',priority:false,minScore:''};temperature='';ownerFilter='';search='';dataFilter='all';kanban()});
+ document.querySelector('#edit-stages')?.addEventListener('click',stageEditor);
+ // Alerta de lead parado (como o "rotting" do Pipedrive)
+ document.querySelectorAll('.lead-card').forEach(b=>{const l=leads.find(x=>x.phone===b.dataset.phone),st=allStages.find(s=>s.key===l?.stage);
+  if(l&&st?.rot_days){const d=Math.floor((Date.now()-new Date(l.updated_at||l.created_at))/DAY);if(d>=st.rot_days){b.classList.add('rotting');b.querySelector('.card-top')?.insertAdjacentHTML('beforeend',`<span class="rot-chip">Parado há ${d}d</span>`)}}});
+};
+
+/* ---------- Editor de etapas (admin) ---------- */
+function stageEditor(){
+ document.querySelector('dialog')?.remove();
+ const d=document.createElement('dialog');d.className='wide-dialog';document.body.append(d);
+ const draw=()=>{
+  const open=allStages.filter(s=>s.kind!=='lost'),lost=allStages.filter(s=>s.kind==='lost');
+  const count=k=>leads.filter(l=>l.stage===k).length;
+  const row=(s,i,list)=>`<div class="stage-row" data-key="${s.key}">
+   <input type="color" name="color" value="${esc(s.color)}" aria-label="Cor">
+   <input name="label" value="${esc(s.label)}" maxlength="40" aria-label="Nome da etapa">
+   <label class="mini">Alerta parado<input name="rot_days" type="number" min="1" max="365" placeholder="—" value="${s.rot_days??''}"> dias</label>
+   <span class="muted mini">${count(s.key)} leads</span>
+   ${s.is_system?'<span class="test-chip" title="Usada pela IA, pela agenda ou pelo fechamento. Pode renomear, mudar cor e posição.">Automação</span>':''}
+   <span class="row-actions">
+    ${s.kind==='lost'?'':`<button data-up ${i===0?'disabled':''} aria-label="Subir">↑</button><button data-down ${i===list.length-1?'disabled':''} aria-label="Descer">↓</button>`}
+    <button data-save class="primary">Salvar</button>
+    <button data-del class="danger" ${s.is_system?'disabled title="Etapa usada pela automação"':''}>Excluir</button>
+   </span></div>`;
+  d.innerHTML=`<h2>Etapas do funil</h2><p class="muted" style="margin:8px 0 18px;font-size:12px;line-height:1.6">Renomeie, mude a cor, a ordem ou crie etapas novas. Ao excluir uma etapa com leads, você escolhe para onde eles vão. Etapas marcadas como <b>Automação</b> são usadas pela IA e pela agenda: podem ser renomeadas e reordenadas, mas não excluídas. "Alerta parado" destaca cartões sem movimento há X dias.</p>
+   <div class="stage-list">${open.map((s,i)=>row(s,i,open)).join('')}${lost.map((s,i)=>row(s,i,lost)).join('')}</div>
+   <form id="new-stage" class="stage-row new"><input type="color" name="color" value="#608aeb"><input name="label" placeholder="Nome da nova etapa (ex.: Proposta enviada)" maxlength="40" required><button class="primary">＋ Criar etapa</button></form>
+   <div class="actions"><button type="button" id="dismiss">Fechar</button></div>`;
+  d.querySelector('#dismiss').onclick=()=>{d.close();kanban()};
+  const call=async(a,p)=>{const {data,error}=await db.rpc('orbita_stage_admin',{p_action:a,p});if(error)throw error;await loadMeta();draw();return data};
+  const safe=f=>async e=>{e.preventDefault?.();try{await f(e)}catch(err){toast(failText(err))}};
+  d.querySelector('#new-stage').onsubmit=safe(async e=>{const f=new FormData(e.target);await call('save',{label:f.get('label'),color:f.get('color')});toast('Etapa criada.')});
+  d.querySelectorAll('.stage-row[data-key]').forEach(r=>{
+   const key=r.dataset.key,g=n=>r.querySelector(`[name=${n}]`).value;
+   r.querySelector('[data-save]').onclick=safe(async()=>{await call('save',{key,label:g('label'),color:g('color'),rot_days:g('rot_days')});toast('Etapa salva.')});
+   const move=dir=>safe(async()=>{const keys=open.map(s=>s.key),i=keys.indexOf(key),j=i+dir;[keys[i],keys[j]]=[keys[j],keys[i]];await call('move',{keys:[...keys,...lost.map(s=>s.key)]})});
+   r.querySelector('[data-up]')?.addEventListener('click',move(-1));r.querySelector('[data-down]')?.addEventListener('click',move(1));
+   r.querySelector('[data-del]').onclick=safe(async()=>{
+    const n=count(key);if(!n){if(confirmInline(r,'Excluir esta etapa?'))return;await call('delete',{key});toast('Etapa excluída.');return}
+    const others=allStages.filter(s=>s.key!==key);
+    r.insertAdjacentHTML('afterend',`<div class="stage-move" data-for="${key}">Mover os ${n} leads para <select>${others.map(s=>opt(s.key,s.label,'')).join('')}</select> <button class="danger">Mover e excluir</button> <button class="link">Cancelar</button></div>`);
+    const box=r.nextElementSibling;box.querySelector('.link').onclick=()=>box.remove();
+    box.querySelector('.danger').onclick=safe(async()=>{await call('delete',{key,move_to:box.querySelector('select').value});toast('Etapa excluída e leads movidos.')});
+   });
+  });
+ };
+ draw();d.showModal();
+}
+// Confirmação em duas etapas sem usar confirm() do navegador
+function confirmInline(row,msg){if(row.dataset.armed)return false;row.dataset.armed='1';const b=row.querySelector('[data-del]');b.textContent='Confirmar exclusão';toast(msg+' Clique de novo para confirmar.');setTimeout(()=>{delete row.dataset.armed;if(b.isConnected)b.textContent='Excluir'},5000);return true}
+
+/* ---------- Conversas: filtros ---------- */
+const inboxV4=inbox;
+inbox=()=>{
+ inboxV4();
+ const list=document.querySelector('.inbox-list'),split=document.querySelector('.split');if(!list||!split)return;
+ const match=l=>(!IF.owner||l.assigned_to===IF.owner)&&(!IF.temp||l.temperature===IF.temp)&&(!IF.mode||l.mode===IF.mode)&&(!IF.waiting||waitingHuman(l))&&
+  inPeriod(lastAt(l),IF.period,IF.from,IF.to)&&[l.name,l.company,l.phone,l.contact_phone].join(' ').toLowerCase().includes(IF.q.toLowerCase());
+ const ok=leads.filter(match).sort((a,b)=>lastAt(b)-lastAt(a));
+ if(ok.length&&!ok.some(l=>l.phone===selected)){selected=ok[0].phone;return inbox()}
+ const rows=[...list.querySelectorAll('[data-lead]')],byPhone=new Map(rows.map(r=>[r.dataset.lead,r]));
+ rows.forEach(r=>r.remove());
+ ok.forEach(l=>{const r=byPhone.get(l.phone);if(!r)return;const t=lastAt(l);r.querySelector('.last-at')?.remove();r.insertAdjacentHTML('beforeend',`<small class="last-at">${t?date(new Date(t)):''}${waitingHuman(l)?' · <b class="wait">aguardando humano</b>':''}</small>`);list.append(r)});
+ if(!ok.length)list.insertAdjacentHTML('beforeend','<div class="empty" style="padding:24px">Nenhuma conversa com esses filtros.</div>');
+ const n=[IF.q,IF.owner,IF.temp,IF.mode,IF.period,IF.waiting?'1':''].filter(Boolean).length;
+ split.insertAdjacentHTML('beforebegin',`<div class="toolbar filters2 inbox-filters">
+  <input id="i-q" placeholder="Buscar nome, empresa ou telefone" value="${esc(IF.q)}">
+  ${ownerSelect('i-owner',IF.owner)}
+  <select id="i-temp" aria-label="Temperatura">${opt('','Todas as temperaturas',IF.temp)}${[['hot','Só quentes'],['warm','Mornos'],['cold','Frios'],['unknown','A qualificar']].map(a=>opt(a[0],a[1],IF.temp)).join('')}</select>
+  <select id="i-mode" aria-label="Atendimento">${opt('','Qualquer atendimento',IF.mode)}${[['bot','IA atendendo'],['human','Com humano'],['paused','IA pausada'],['optout','Encerrados']].map(a=>opt(a[0],a[1],IF.mode)).join('')}</select>
+  <select id="i-period" aria-label="Última mensagem">${opt('','Última mensagem: qualquer data',IF.period)}${[['today','Hoje'],['7','Últimos 7 dias'],['30','Últimos 30 dias'],['custom','Escolher datas…']].map(a=>opt(a[0],a[1],IF.period)).join('')}</select>
+  ${IF.period==='custom'?`<label class="mini">de <input type="date" id="i-from" value="${IF.from}"></label><label class="mini">até <input type="date" id="i-to" value="${IF.to}"></label>`:''}
+  <label class="check"><input type="checkbox" id="i-wait" ${IF.waiting?'checked':''}> Só aguardando humano</label>
+  <small class="right">${ok.length} de ${leads.length} conversas</small>${n?'<button id="i-clear" class="link">Limpar</button>':''}
+ </div>`);
+ const on=(id,k,ev='onchange')=>{const el=document.querySelector(id);if(el)el[ev]=e=>{IF[k]=e.target.type==='checkbox'?e.target.checked:e.target.value;inbox();if(id==='#i-q'){const f=document.querySelector('#i-q');f.focus();f.setSelectionRange(IF.q.length,IF.q.length)}}};
+ on('#i-q','q','oninput');on('#i-owner','owner');on('#i-temp','temp');on('#i-mode','mode');on('#i-period','period');on('#i-from','from');on('#i-to','to');on('#i-wait','waiting');
+ document.querySelector('#i-clear')?.addEventListener('click',()=>{IF={q:'',owner:'',temp:'',mode:'',period:'',from:'',to:'',waiting:false};inbox()});
+ // Etapas vindas do banco (inclui etapas criadas pelo admin)
+ const sel=document.querySelector('#stage'),cur=leads.find(l=>l.phone===selected);
+ if(sel&&allStages.length&&cur){sel.innerHTML=allStages.map(s=>opt(s.key,s.label,cur.stage)).join('')}
+};
+
+/* ---------- Agenda: filtros ---------- */
+const calendarV4=calendar;
+calendar=()=>{
+ calendarV4();
+ const surface=document.querySelector('#surface');if(!surface)return;
+ const confirmed=bookings.filter(b=>b.status==='confirmed');
+ const ownerName=id=>members.find(m=>m.user_id===id)?.name||'';
+ const slotOk=s=>{
+  const b=confirmed.find(x=>x.slot_id===s.id),l=b?leads.find(x=>x.phone===b.phone):null;
+  if(AF.status==='free'&&(b||s.reserved))return false;
+  if(AF.status==='booked'&&!(b||s.reserved))return false;
+  if(AF.kind&&(!!s.is_demo)!==(AF.kind==='demo'))return false;
+  if(AF.days&&+new Date(s.starts_at)>Date.now()+Number(AF.days)*DAY)return false;
+  if(AF.owner){const n=ownerName(AF.owner).toLowerCase();if(!(l?.assigned_to===AF.owner||(n&&String(s.resource||'').toLowerCase().includes(n))))return false}
+  if(AF.q){const q=AF.q.toLowerCase();if(!l||![l.name,l.company,l.phone,l.contact_phone].join(' ').toLowerCase().includes(q))return false}
+  return true};
+ document.querySelectorAll('[data-slot]').forEach(btn=>{const s=slots.find(x=>x.id===btn.dataset.slot);const show=s?slotOk(s):true;btn.hidden=!show;
+  let n=btn.nextElementSibling;while(n&&!n.matches('[data-slot]')){if(n.matches('[data-edit-slot]'))n.hidden=!show;n=n.nextElementSibling}});
+ document.querySelectorAll('.calendar .day').forEach(day=>{day.hidden=![...day.querySelectorAll('[data-slot]')].some(b=>!b.hidden)});
+ const rows=[...surface.querySelectorAll('.table tbody tr')];
+ rows.forEach((tr,i)=>{const b=confirmed[i];if(!b)return;const s=slots.find(x=>x.id===b.slot_id);tr.hidden=s?!slotOk(s):false;
+  const l=leads.find(x=>x.phone===b.phone);const td=tr.children[2];if(td&&l)td.innerHTML=`${esc(s?.resource||'')}<br><small class="muted">Carteira: ${esc(ownerName(l.assigned_to)||'—')}</small>`});
+ const n=[AF.owner,AF.q,AF.status,AF.kind,AF.days].filter(Boolean).length;
+ surface.insertAdjacentHTML('afterbegin',`<div class="toolbar filters2">
+  <input id="a-q" placeholder="Buscar lead por nome ou telefone" value="${esc(AF.q)}">
+  ${ownerSelect('a-owner',AF.owner)}
+  <select id="a-status" aria-label="Situação">${opt('','Livres e reservados',AF.status)}${[['free','Só livres'],['booked','Só reservados']].map(a=>opt(a[0],a[1],AF.status)).join('')}</select>
+  <select id="a-kind" aria-label="Tipo">${opt('','Reais e de teste',AF.kind)}${[['real','Só reais'],['demo','Só de teste']].map(a=>opt(a[0],a[1],AF.kind)).join('')}</select>
+  <select id="a-days" aria-label="Período">${opt('','Todo o período',AF.days)}${[['1','Próximas 24 h'],['7','Próximos 7 dias'],['14','Próximos 14 dias']].map(a=>opt(a[0],a[1],AF.days)).join('')}</select>
+  ${n?'<button id="a-clear" class="link">Limpar filtros</button>':''}
+ </div>`);
+ const on=(id,k,ev='onchange')=>{const el=document.querySelector(id);if(el)el[ev]=e=>{AF[k]=e.target.value;calendar();if(id==='#a-q'){const f=document.querySelector('#a-q');f.focus();f.setSelectionRange(AF.q.length,AF.q.length)}}};
+ on('#a-q','q','oninput');on('#a-owner','owner');on('#a-status','status');on('#a-kind','kind');on('#a-days','days');
+ document.querySelector('#a-clear')?.addEventListener('click',()=>{AF={owner:'',q:'',status:'',kind:'',days:''};calendar()});
+};
+
+/* ---------- Configurações: regras de qualificação (CRUD) ---------- */
+const ruleCond=r=>{const f=RULE_FIELDS[r.field]||{label:r.field};
+ if(r.op==='is_true')return `${f.label} = sim`;if(r.op==='is_false')return `${f.label} = não`;if(r.op==='filled')return `${f.label} informado(a)`;
+ const vals=String(r.value||'').split(',').map(v=>(f.values||[]).find(x=>x[0]===v.trim())?.[1]||v).join(' ou ');return `${f.label}: ${vals}`};
+const configurationV4=configuration;
+configuration=()=>{
+ configurationV4();
+ const panel=[...document.querySelectorAll('#surface .panel')].find(p=>p.querySelector('h2')?.textContent.includes('Qualificação transparente'));
+ if(!panel)return;
+ panel.classList.add('rules-panel');
+ const hot=settings.hot_threshold||70,warm=settings.warm_threshold||40;
+ panel.innerHTML=`<div class="section-row" style="margin-bottom:10px"><div><h2>Qualificação transparente</h2><p class="muted" style="font-size:12px;margin-top:6px">A IA só extrai fatos com prova. Estas regras somam os pontos.</p></div><button class="primary" id="rule-new">＋ Nova regra</button></div>
+ <div class="table-scroll"><table class="table rules"><thead><tr><th></th><th>Regra</th><th>Quando vale</th><th>Pontos</th><th>Quente</th><th>Ativa</th><th></th></tr></thead><tbody>
+ ${scoreRules.map((r,i)=>`<tr data-rule="${r.id}" class="${r.enabled?'':'off'}"><td class="order"><button data-up ${i===0?'disabled':''} aria-label="Subir">↑</button><button data-down ${i===scoreRules.length-1?'disabled':''} aria-label="Descer">↓</button></td>
+  <td><strong>${esc(r.label)}</strong>${r.description?`<br><small class="muted">${esc(r.description)}</small>`:''}</td><td>${esc(ruleCond(r))}</td>
+  <td><b class="${r.points<0?'neg':'pos'}">${r.points>0?'+':''}${r.points}</b></td>
+  <td>${r.required_hot?'<span class="badge hot">Obrigatória</span> ':''}${r.counts_hot?'':'<span class="badge">Não conta p/ quente</span>'}</td>
+  <td><label class="switch"><input type="checkbox" data-toggle ${r.enabled?'checked':''}><span></span></label></td>
+  <td class="row-actions"><button data-edit>Editar</button><button data-del class="danger">Excluir</button></td></tr>`).join('')||'<tr><td colspan="7">Nenhuma regra. Crie a primeira.</td></tr>'}
+ </tbody></table></div>
+ <div class="rule-legend"><div><b>Quente</b> soma das regras que contam para quente ≥ <b>${hot}</b> e todas as obrigatórias atendidas → a IA sai e o responsável é avisado no Slack.</div><div><b>Morno</b> pontuação total ≥ <b>${warm}</b>. Reunião confirmada garante no mínimo morno.</div><div class="muted">Os limites ficam no quadro "Operação". Mudanças valem para as próximas mensagens de cada lead.</div></div>`;
+ const call=async(a,p,msg)=>{const {error}=await db.rpc('orbita_rule_admin',{p_action:a,p});if(error){toast(failText(error));throw error}await loadMeta();configuration();if(msg)toast(msg)};
+ panel.querySelector('#rule-new').onclick=()=>ruleForm();
+ panel.querySelectorAll('tr[data-rule]').forEach(tr=>{const r=scoreRules.find(x=>x.id===tr.dataset.rule),i=scoreRules.indexOf(r);
+  tr.querySelector('[data-edit]').onclick=()=>ruleForm(r);
+  tr.querySelector('[data-toggle]').onchange=e=>call('save',{...r,enabled:e.target.checked},e.target.checked?'Regra ativada.':'Regra desativada.').catch(()=>{});
+  tr.querySelector('[data-del]').onclick=()=>modal('Excluir a regra "'+esc(r.label)+'"?','<p>Os leads já pontuados mantêm a nota atual até a próxima mensagem.</p>',()=>call('delete',{id:r.id},'Regra excluída.'),'Excluir');
+  const move=dir=>()=>{const ids=scoreRules.map(x=>x.id);[ids[i],ids[i+dir]]=[ids[i+dir],ids[i]];call('move',{ids}).catch(()=>{})};
+  tr.querySelector('[data-up]').onclick=move(-1);tr.querySelector('[data-down]').onclick=move(1);
+ });
+};
+function ruleForm(r){
+ const v=r||{label:'',description:'',field:'need',op:'filled',value:'',points:10,required_hot:false,counts_hot:true,enabled:true};
+ modal(r?'Editar regra':'Nova regra',`<div class="formgrid">
+  <label class="wide">Nome da regra<input name="label" value="${esc(v.label)}" maxlength="60" required></label>
+  <label class="wide">Explicação (aparece para a equipe)<input name="description" value="${esc(v.description||'')}" maxlength="240"></label>
+  <label>Dado analisado<select name="field">${Object.entries(RULE_FIELDS).map(([k,f])=>opt(k,f.label,v.field)).join('')}</select></label>
+  <label>Condição<select name="op"></select></label>
+  <div class="wide" id="rule-values"></div>
+  <label>Pontos (-100 a 100)<input name="points" type="number" min="-100" max="100" value="${v.points}" required></label>
+  <div class="checks"><label class="check"><input type="checkbox" name="required_hot" ${v.required_hot?'checked':''}> Obrigatória para ficar quente</label>
+  <label class="check"><input type="checkbox" name="counts_hot" ${v.counts_hot?'checked':''}> Conta para a nota de quente</label>
+  <label class="check"><input type="checkbox" name="enabled" ${v.enabled?'checked':''}> Ativa</label></div>
+ </div>`,async f=>{
+  const p={id:r?.id||'',label:f.get('label'),description:f.get('description'),field:f.get('field'),op:f.get('op'),value:f.getAll('value').join(','),points:Number(f.get('points')),required_hot:f.has('required_hot'),counts_hot:f.has('counts_hot'),enabled:f.has('enabled')};
+  const {error}=await db.rpc('orbita_rule_admin',{p_action:'save',p});if(error)throw error;await loadMeta();configuration();toast('Regra salva. Vale a partir da próxima mensagem de cada lead.')
+ },r?'Salvar regra':'Criar regra');
+ const d=document.querySelector('dialog'),fs=d.querySelector('[name=field]'),os=d.querySelector('[name=op]'),box=d.querySelector('#rule-values');
+ const sync=first=>{const f=RULE_FIELDS[fs.value];
+  const ops=f.type==='bool'?[['is_true','é sim'],['is_false','é não']]:f.type==='text'?[['filled','foi informado']]:[['in','é um destes valores']];
+  const curOp=first&&v.field===fs.value?(v.op==='equals'?'in':v.op):ops[0][0];os.innerHTML=ops.map(o=>opt(o[0],o[1],curOp)).join('');
+  const chosen=first&&v.field===fs.value?String(v.value||'').split(','):[];
+  box.innerHTML=f.type==='enum'?`<span class="muted mini">Valores</span><div class="checks">${f.values.map(x=>`<label class="check"><input type="checkbox" name="value" value="${x[0]}" ${chosen.includes(x[0])?'checked':''}> ${x[1]}</label>`).join('')}</div>`:'';};
+ fs.onchange=()=>sync(false);sync(true);
+}
+
+/* ---------- Fluxo & decisões: 3 fluxos e riscos atualizados ---------- */
+flow=()=>{
+ const box=(t,s,i)=>`<div class="flow-box"><em>0${i+1}</em><strong>${t}</strong><span>${s}</span></div>`;
+ const card=(badge,cls,title,steps,text,link)=>`<div class="panel" style="margin-bottom:20px"><span class="badge ${cls}">${badge}</span><h2 style="margin:15px 0 24px">${title}</h2><div class="flow-steps">${steps.map((x,i)=>box(x[0],x[1],i)).join('')}</div><p class="muted" style="line-height:1.8;margin-top:22px">${text}</p><a href="${link}" target="_blank" rel="noopener">Abrir no n8n ↗</a></div>`;
+ document.querySelector('#surface').innerHTML=`<div class="notice"><b>Três fluxos, uma jornada.</b> Telegram é o canal real de teste e o simulador reproduz o WhatsApp dentro do CRM. Supabase é a fonte única: CRM, agenda, regras e memória da IA.</div>
+ ${card('FLUXO 01 · ATENDIMENTO','blue','Receber → Qualificar → CRM e agenda',[['Identificar','Telegram pelo chat_id, sem pedir telefone'],['Conversar','Claude com memória no Postgres e histórico do banco'],['Validar','Só aceita fato com citação literal do lead'],['Pontuar e agendar','Regras editáveis somam pontos; horários reais']],'O banco decide a temperatura com as regras da tela Configurações. Pediu reunião: a IA oferece 3 horários e o lead responde com o número. Quente: a IA sai e chama o fluxo 03.','https://autoconfi.app.n8n.cloud/workflow/i8MOp5VaXEcng8SZ')}
+ ${card('FLUXO 02 · ENTREGA','green','Enviar → Confirmar resultado',[['Resposta pronta','Gatilho do banco chama o webhook'],['Conferir controle humano','Pausa, versão e opt-out antes de enviar'],['Entregar no Telegram','Registrar sucesso, falha ou incerteza']],'Vale para respostas da IA, do sistema e do vendedor. Sem agendador e sem execuções vazias.','https://autoconfi.app.n8n.cloud/workflow/DS09OVYC0j9mR1mU')}
+ ${card('FLUXO 03 · LEAD QUENTE','hot','Quente → Humano assume',[['Tirar a IA','Modo humano e respostas da IA canceladas'],['Montar o contexto','Pontuação, motivos, resumo e últimas mensagens'],['Avisar no Slack','DM para o responsável, com botão para a conversa']],'O aviso sai uma única vez por lead. Sem Slack cadastrado, vai para o administrador.','https://autoconfi.app.n8n.cloud/workflow/ZbaXLf4MTCcGTmX9')}
+ <h2 class="section-title">Riscos e como o fluxo trata</h2><div class="grid2">${[
+  ['IA inventar informação','Todo fato precisa de citação literal do lead; o que não tem prova é descartado. A IA não calcula nota, não confirma reunião e não promete preço.'],
+  ['Prompt injection','Mensagens do lead entram como dados. Pedidos para mudar regras ou nota são recusados e a validação barra promessas de preço e reunião confirmada.'],
+  ['IA fora do ar ou resposta quebrada','O validador aceita JSON embrulhado; se falhar mesmo assim, o lead vai para humano com tarefa e SLA.'],
+  ['Humano e bot falando juntos','Assumir ou pausar cancela respostas pendentes; cada resposta tem versão e é conferida antes do envio.'],
+  ['Mensagem duplicada ou perdida','Evento único por mensagem; entrega registra enviado, falha ou incerto para conferência.'],
+  ['Conflito de agenda','Reserva transacional: o mesmo horário não aceita duas reuniões. Horários de teste separados dos reais.'],
+  ['LGPD e opt-out','"Parar" encerra o contato na hora. Cada funcionário só vê a própria carteira (RLS no banco).'],
+  ['WhatsApp oficial (produção)','Janela de 24 h, templates aprovados e risco de bloqueio do número. Hoje o teste roda no Telegram.'],
+  ['Custo e latência','Histórico enviado duas vezes (memória + banco) aumenta tokens. Próximo passo: resumir o histórico antigo.'],
+  ['Credenciais','Chaves ficam no n8n e no Supabase, nunca no navegador. Tokens expostos durante o desenvolvimento devem ser trocados.']
+ ].map(x=>`<div class="panel"><h3>${x[0]}</h3><p class="muted" style="font-size:12px;line-height:1.8;margin-top:10px">${x[1]}</p></div>`).join('')}</div>`;
+};
+
 startApp();
 
 setInterval(()=>{if(session&&!demo&&!document.querySelector('dialog[open]')&&document.activeElement?.tagName!=='TEXTAREA'&&document.activeElement?.tagName!=='INPUT')refresh().catch(()=>toast('Conexão indisponível. Seus dados salvos permanecem no banco.'))},15000);
