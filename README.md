@@ -4,7 +4,7 @@ Aplicação própria para uma empresa de automação e IA. Cadastro, conversa, q
 
 ## Acessar e demonstrar
 
-- CRM hospedado na Vercel (projeto `orbita-crm`, pasta `dist/`, sem build). Endereço antigo: https://orbita-crm-opens-joao.limalipe355.chatgpt.site/.
+- [Abrir CRM](https://orbita-crm-theta.vercel.app/) (Vercel, projeto `orbita-crm`, pasta `dist/`, sem build). Endereço antigo: https://orbita-crm-opens-joao.limalipe355.chatgpt.site/.
 - Administrador: l2mortal01@gmail.com. Credenciais iniciais estão no arquivo local `../ACESSOS-PRIVADOS.txt`, fora deste projeto e do ZIP.
 - Três funcionários: Ana Martins, Bruno Almeida e Carla Santos, com 12 leads fictícios cada. Use o filtro de demonstração para comparar carteiras. O administrador também possui o lead utilizado no teste integrado.
 - Entre, abra Simulador WhatsApp, informe um telefone de teste com código do país e converse. Exemplo: nome/empresa → necessidade de automação → prazo neste mês → decisor → opção de horário.
@@ -71,7 +71,7 @@ Os SQLs documentam a instalação e evolução; o projeto remoto já está atual
 ## Pendências para validar operação externa
 
 1. Enviar “Olá” e compartilhar o próprio contato no bot Telegram correto. Credenciais estão vinculadas e fluxos publicados, mas a conversa real no Telegram ainda não foi confirmada neste teste.
-2. Supabase → Authentication → URL Configuration: Site URL `https://orbita-crm-opens-joao.limalipe355.chatgpt.site`; autorizar Redirect URL `https://orbita-crm-opens-joao.limalipe355.chatgpt.site/**` e, apenas para desenvolvimento, `http://127.0.0.1:4173/**`. Configurar SMTP e verificar recebimento/abertura do e-mail de recuperação. O painel não estava autenticado e o MCP não oferece essa configuração.
+2. Supabase → Authentication → URL Configuration: Site URL `https://orbita-crm-theta.vercel.app`; autorizar Redirect URL `https://orbita-crm-theta.vercel.app/**` e, apenas para desenvolvimento, `http://127.0.0.1:4173/**`. Configurar SMTP e verificar recebimento/abertura do e-mail de recuperação. O painel não estava autenticado e o MCP não oferece essa configuração.
 3. Trocar senhas iniciais pela Minha conta. E-mails .example são fictícios e não recebem recuperação; usar e-mails reais ao cadastrar a equipe real.
 
 ## Riscos e decisões
@@ -112,7 +112,7 @@ Teste técnico de entrega: mensagens de bot e humano acionaram webhook e percorr
 
 - `vercel.json` publica `dist/` como site estático, sem etapa de build.
 - Depois do primeiro deploy, incluir o domínio da Vercel em Supabase → Authentication → URL Configuration (Site URL e Redirect URLs) para a recuperação de senha funcionar.
-- A Edge Function `orbita-crm` aceita chamadas do domínio `orbita-crm*.vercel.app` (CORS), além do endereço antigo.
+- A Edge Function `orbita-crm` aceita chamadas de `https://orbita-crm-theta.vercel.app` (CORS), além do endereço antigo durante a transição.
 
 ## Memória da IA
 

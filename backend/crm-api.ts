@@ -1,8 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.4';
 const url=Deno.env.get('SUPABASE_URL')!,secret=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const service=createClient(url,secret,{auth:{persistSession:false}});
-const origins=['https://orbita-crm-opens-joao.limalipe355.chatgpt.site','http://127.0.0.1:4173'];
-const allowed=(o:string)=>origins.includes(o)||/^https:\/\/orbita-crm[a-z0-9-]*\.vercel\.app$/.test(o);
+const origins=['https://orbita-crm-theta.vercel.app','https://orbita-crm-opens-joao.limalipe355.chatgpt.site','http://127.0.0.1:4173'];
+const allowed=(o:string)=>origins.includes(o);
 Deno.serve(async req=>{
  const origin=req.headers.get('origin')||'';
  const cors={'Access-Control-Allow-Origin':allowed(origin)?origin:origins[0],'Access-Control-Allow-Headers':'authorization,apikey,content-type,x-client-info','Access-Control-Allow-Methods':'POST,OPTIONS','Vary':'Origin'};
