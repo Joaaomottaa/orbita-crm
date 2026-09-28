@@ -9,7 +9,7 @@ Aplicação própria para uma empresa de automação e IA. Cadastro, conversa, q
 - Três funcionários: Ana Martins, Bruno Almeida e Carla Santos, com 12 leads fictícios cada. Use o filtro de demonstração para comparar carteiras. O administrador também possui o lead utilizado no teste integrado.
 - Entre, abra Simulador WhatsApp, informe um telefone de teste com código do país e converse. Exemplo: nome/empresa → necessidade de automação → prazo neste mês → decisor → opção de horário.
 - O simulador usa Claude real e grava o lead no CRM. Não envia mensagens para a Meta. Retomar o mesmo telefone preserva o histórico; uma conversa assumida pelo humano permanece humana até o operador retomar a IA.
-- O Site conserva o acesso privado do proprietário na hospedagem. Os usuários do Supabase já existem, mas compartilhar o Site com funcionários externos também exige configurar o acesso na hospedagem.
+- A hospedagem está configurada como pública; o CRM exige login Supabase e limita os dados pelo perfil. Os funcionários podem abrir o endereço e entrar com sua conta.
 
 ## Dois fluxos, uma jornada
 
@@ -72,7 +72,7 @@ Os SQLs documentam a instalação e evolução; o projeto remoto já está atual
 
 1. Enviar “Olá” e compartilhar o próprio contato no bot Telegram correto. Credenciais estão vinculadas e fluxos publicados, mas a conversa real no Telegram ainda não foi confirmada neste teste.
 2. Supabase → Authentication → URL Configuration: Site URL `https://orbita-crm-opens-joao.limalipe355.chatgpt.site`; autorizar Redirect URL `https://orbita-crm-opens-joao.limalipe355.chatgpt.site/**` e, apenas para desenvolvimento, `http://127.0.0.1:4173/**`. Configurar SMTP e verificar recebimento/abertura do e-mail de recuperação. O painel não estava autenticado e o MCP não oferece essa configuração.
-3. Para uso por outros funcionários, configurar compartilhamento da hospedagem; hoje o Site é privado do proprietário. Trocar senhas iniciais pela Minha conta. E-mails .example são fictícios e não recebem recuperação; usar e-mails reais ao cadastrar a equipe real.
+3. Trocar senhas iniciais pela Minha conta. E-mails .example são fictícios e não recebem recuperação; usar e-mails reais ao cadastrar a equipe real.
 
 ## Riscos e decisões
 
